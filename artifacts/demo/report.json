@@ -1,11 +1,11 @@
 {
   "version": "runmirror.report/v1",
-  "generatedBy": "runmirror@0.1.0",
+  "generatedBy": "runmirror@0.1.1",
   "deterministic": true,
   "runId": "offline-demo",
   "integrity": {
     "valid": true,
-    "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f"
+    "rootHash": "b3bc33116f0fa05c5f9599a1845bd2dc925c8f8f77c834bdcf0c43a4a2fd25f9"
   },
   "eventCount": 7,
   "kinds": [
@@ -22,7 +22,7 @@
     "runId": "offline-demo",
     "integrity": {
       "valid": true,
-      "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f"
+      "rootHash": "b3bc33116f0fa05c5f9599a1845bd2dc925c8f8f77c834bdcf0c43a4a2fd25f9"
     },
     "matchedEvents": 7,
     "totalEvents": 7,
@@ -33,7 +33,7 @@
     "runId": "offline-demo",
     "integrity": {
       "valid": true,
-      "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f"
+      "rootHash": "b3bc33116f0fa05c5f9599a1845bd2dc925c8f8f77c834bdcf0c43a4a2fd25f9"
     },
     "matchedEvents": 3,
     "totalEvents": 7,

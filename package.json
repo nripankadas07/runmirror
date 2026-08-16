@@ -1,6 +1,6 @@
 {
   "name": "runmirror",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Explicit deterministic recorder and offline replay SDK for agent runs.",
   "type": "module",
   "private": true,

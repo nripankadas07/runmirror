@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.1] - 2026-08-16
+
+### Changed
+
+- Replay now snapshots authenticated cassettes, passes deeply frozen event clones to adapters, and re-verifies both the snapshot and caller-owned cassette before returning. An adapter can no longer rewrite expected output after the initial integrity check.
+- New recordings identify as `runmirror@0.1.1`; the parser remains compatible with `runmirror@0.1.0` cassettes.
+- Trailing CLI operands and option-like positional values are rejected instead of silently ignored.
+- Sparse or extended redaction-key and authenticated event arrays are rejected as non-canonical cassette structure.
+- Artifact sets use component-verified staging, directory/target identity rechecks, per-file atomic renames, and set-level backup/rollback. Output-path and target-file symlinks are rejected before publication.
+- Serialize cooperative artifact writers with a bounded fail-closed filesystem lock and reconcile rename-then-error outcomes by inode identity, preventing mixed concurrent bundles and restoring the full prior set after ambiguous failures.
+
+Adapters that mutated their supplied event or input objects in `0.1.0` now receive a deterministic `adapter-error` divergence; non-canonical arrays accepted by loose direct callers are rejected.
+
 ## [0.1.0] - 2026-08-16
 
 ### Added

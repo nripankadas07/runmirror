@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rename as fsRename, rmdir, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { createDemoRun } from "../src/demo.js";
 import { htmlReport, markdownReport, writeArtifacts } from "../src/report.js";
+import { writeArtifactSet } from "../src/safe-output.js";
 import { recordedOutputAdapters, replay } from "../src/replay.js";
 import { Recorder } from "../src/cassette.js";
 
@@ -120,6 +121,41 @@ test("divergence artifacts fingerprint adapter values and handle undefined safel
   assert.equal(nestedUndefined.divergence?.reason, "adapter-error");
 });
 
+test("adapters cannot mutate authenticated expectations and post-replay integrity is checked", async () => {
+  const recorder = new Recorder({ runId: "immutable", createdAt: "2026-01-01T00:00:00.000Z" });
+  recorder.tool({ name: "x", arguments: {} }, { answer: "expected" });
+  const cassette = recorder.cassette();
+  const attemptedMutation = await replay(cassette, {
+    tool: (_input, event) => {
+      event.output = { answer: "forged" };
+      return { answer: "forged" };
+    },
+  });
+  assert.equal(attemptedMutation.divergence?.reason, "adapter-error");
+  assert.equal(attemptedMutation.integrity.valid, true);
+  assert.equal(cassette.events[0]?.output && (cassette.events[0]?.output as { answer: string }).answer, "expected");
+
+  const externallyMutated = recorder.cassette();
+  const mutationDetected = await replay(externallyMutated, {
+    tool: () => {
+      const event = externallyMutated.events[0];
+      assert.ok(event);
+      event.output = { answer: "changed-outside-adapter-argument" };
+      return { answer: "expected" };
+    },
+  });
+  assert.equal(mutationDetected.integrity.valid, false);
+  assert.equal(mutationDetected.integrity.reason, "event hash mismatch");
+});
+
+test("CLI rejects trailing operands and option-like output paths", () => {
+  for (const args of [["demo", "out", "extra"], ["demo", "--typo"], ["verify", "cassette.jsonl", "extra"]]) {
+    const cli = spawnSync(process.execPath, ["dist/src/cli.js", ...args], { encoding: "utf8" });
+    assert.equal(cli.status, 1);
+    assert.match(cli.stderr, /usage:/u);
+  }
+});
+
 test("artifact writer produces a self-contained deterministic timeline", async () => {
   const demo = await createDemoRun();
   const first = await mkdtemp(join(tmpdir(), "runmirror-a-"));
@@ -134,4 +170,89 @@ test("artifact writer produces a self-contained deterministic timeline", async (
   assert.equal(demo.cassette.events.length, golden.events);
   assert.equal(demo.replay.integrity.rootHash, golden.rootHash);
   assert.equal(demo.replay.matchedEvents, golden.baselineMatched);
+});
+
+test("artifact publication rejects symlink and non-directory targets before writing", async () => {
+  const root = await mkdtemp(join(tmpdir(), "runmirror-safe-output-"));
+  const victim = join(root, "victim.txt");
+  await writeFile(victim, "unchanged\n");
+  const demo = await createDemoRun();
+
+  const fileTarget = join(root, "file-target");
+  await mkdir(fileTarget);
+  await symlink(victim, join(fileTarget, "cassette.jsonl"));
+  await assert.rejects(writeArtifacts(fileTarget, demo), /regular file/u);
+  assert.equal(await readFile(victim, "utf8"), "unchanged\n");
+  assert.deepEqual(await readdir(fileTarget), ["cassette.jsonl"]);
+
+  const directoryVictim = join(root, "directory-victim");
+  await mkdir(directoryVictim);
+  const linkedOutput = join(root, "linked-output");
+  await symlink(directoryVictim, linkedOutput);
+  await assert.rejects(writeArtifacts(linkedOutput, demo), /symbolic-link component/u);
+  await assert.rejects(writeArtifacts(join(linkedOutput, "nested"), demo), /symbolic-link component/u);
+  assert.deepEqual(await readdir(directoryVictim), []);
+
+  const parentFile = join(root, "not-a-directory");
+  await writeFile(parentFile, "x");
+  await assert.rejects(writeArtifacts(join(parentFile, "child"), demo));
+
+  const transactional = join(root, "transactional");
+  await mkdir(transactional);
+  await writeFile(join(transactional, "one.txt"), "original\n");
+  let publishes = 0;
+  await assert.rejects(writeArtifactSet(transactional, { "one.txt": "replacement\n", "two.txt": "new\n" }, {
+    publishRename: async (source, destination) => {
+      publishes += 1;
+      if (publishes === 2) throw new Error("injected second publish failure");
+      await fsRename(source, destination);
+    },
+  }), /injected second publish failure/u);
+  assert.equal(publishes, 2);
+  assert.equal(await readFile(join(transactional, "one.txt"), "utf8"), "original\n");
+  assert.deepEqual(await readdir(transactional), ["one.txt"]);
+
+  const ambiguous = join(root, "ambiguous-rename");
+  await mkdir(ambiguous);
+  await writeFile(join(ambiguous, "one.txt"), "original-one\n");
+  await writeFile(join(ambiguous, "two.txt"), "original-two\n");
+  let completedRenames = 0;
+  await assert.rejects(writeArtifactSet(ambiguous, { "one.txt": "replacement-one\n", "two.txt": "replacement-two\n" }, {
+    publishRename: async (source, destination) => {
+      await fsRename(source, destination);
+      completedRenames += 1;
+      if (completedRenames === 2) throw new Error("injected post-rename failure");
+    },
+  }), /injected post-rename failure/u);
+  assert.equal(await readFile(join(ambiguous, "one.txt"), "utf8"), "original-one\n");
+  assert.equal(await readFile(join(ambiguous, "two.txt"), "utf8"), "original-two\n");
+  assert.deepEqual(await readdir(ambiguous), ["one.txt", "two.txt"]);
+
+  const concurrent = join(root, "concurrent-writers");
+  await mkdir(concurrent);
+  const pause = async (): Promise<void> => new Promise((resolvePause) => { setTimeout(resolvePause, 20); });
+  const writer = async (label: "A" | "B"): Promise<void> => {
+    let writerRenames = 0;
+    await writeArtifactSet(concurrent, { "one.txt": `${label}\n`, "two.txt": `${label}\n` }, {
+      publishRename: async (source, destination) => {
+        writerRenames += 1;
+        if (label === "A" && writerRenames === 1) await pause();
+        await fsRename(source, destination);
+        if (label === "B" && writerRenames === 1) await pause();
+      },
+    });
+  };
+  await Promise.all([writer("A"), writer("B")]);
+  const concurrentContents = await Promise.all(["one.txt", "two.txt"].map(async (name) => readFile(join(concurrent, name), "utf8")));
+  assert.equal(concurrentContents[0], concurrentContents[1]);
+  assert.ok(concurrentContents[0] === "A\n" || concurrentContents[0] === "B\n");
+  assert.deepEqual(await readdir(concurrent), ["one.txt", "two.txt"]);
+
+  const stale = join(root, "stale-lock");
+  await mkdir(stale);
+  const staleLock = join(stale, ".artifact-write.lock");
+  await mkdir(staleLock);
+  await assert.rejects(writeArtifactSet(stale, { "one.txt": "unpublished\n" }, { lockTimeoutMs: 0 }), /lock is held or stale/u);
+  assert.deepEqual(await readdir(stale), [".artifact-write.lock"]);
+  await rmdir(staleLock);
 });

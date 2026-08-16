@@ -1,8 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { DemoRun } from "./demo.js";
 import { verifyCassette } from "./cassette.js";
 import { redactDiagnostic } from "./canonical.js";
+import { writeArtifactSet } from "./safe-output.js";
 
 export const REPORT_VERSION = "runmirror.report/v1" as const;
 
@@ -14,7 +13,7 @@ export function buildReport(run: DemoRun) {
   const redactionKeys = run.cassette.header.redaction.keys;
   return {
     version: REPORT_VERSION,
-    generatedBy: "runmirror@0.1.0",
+    generatedBy: "runmirror@0.1.1",
     deterministic: true,
     runId: redactDiagnostic(run.cassette.header.runId, redactionKeys),
     integrity: verifyCassette(run.cassette),
@@ -41,11 +40,10 @@ export function htmlReport(run: DemoRun): string {
 }
 
 export async function writeArtifacts(outDir: string, run: DemoRun): Promise<void> {
-  await mkdir(outDir, { recursive: true });
-  await Promise.all([
-    writeFile(join(outDir, "cassette.jsonl"), run.jsonl),
-    writeFile(join(outDir, "report.json"), `${JSON.stringify(buildReport(run), null, 2)}\n`),
-    writeFile(join(outDir, "report.md"), markdownReport(run)),
-    writeFile(join(outDir, "index.html"), htmlReport(run)),
-  ]);
+  await writeArtifactSet(outDir, {
+    "cassette.jsonl": run.jsonl,
+    "report.json": `${JSON.stringify(buildReport(run), null, 2)}\n`,
+    "report.md": markdownReport(run),
+    "index.html": htmlReport(run),
+  });
 }

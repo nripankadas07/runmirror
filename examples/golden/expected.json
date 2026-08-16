@@ -4,7 +4,7 @@
   "events": 7,
   "kinds": ["approval", "clock", "error", "file", "model", "random", "tool"],
   "integrityValid": true,
-  "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f",
+  "rootHash": "b3bc33116f0fa05c5f9599a1845bd2dc925c8f8f77c834bdcf0c43a4a2fd25f9",
   "baselineMatched": 7,
   "firstDrift": { "eventId": "offline-demo:0003", "path": "$.bytes", "expected": 11, "actual": 19 },
   "artifacts": ["cassette.jsonl", "report.json", "report.md", "index.html"]

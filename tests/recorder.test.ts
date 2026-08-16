@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCassette, Recorder, verifyCassette } from "../src/cassette.js";
+import { parseCassette, RECORDER_VERSION, Recorder, verifyCassette } from "../src/cassette.js";
 import { canonicalJson, sha256 } from "../src/canonical.js";
 
 test("explicit recorder is deterministic and redacts before hashing", () => {
@@ -14,6 +14,15 @@ test("explicit recorder is deterministic and redacts before hashing", () => {
   assert.ok(!first.includes("synthetic-demo-token"));
   assert.ok(!first.includes("private"));
   assert.equal(verifyCassette(parseCassette(first)).valid, true);
+  assert.equal(parseCassette(first).header.recorder, RECORDER_VERSION);
+});
+
+test("0.1.1 readers remain compatible with empty 0.1.0 cassettes", () => {
+  const recorder = new Recorder({ runId: "legacy", createdAt: "2026-01-01T00:00:00.000Z" });
+  const legacy = recorder.cassette();
+  legacy.header.recorder = "runmirror@0.1.0";
+  assert.equal(verifyCassette(legacy).valid, true);
+  assert.equal(parseCassette(`${canonicalJson(legacy.header)}\n`).header.recorder, "runmirror@0.1.0");
 });
 
 test("cassette parser and verifier reject malformed headers and events without crashing", () => {
@@ -62,4 +71,25 @@ test("tampering and corrupt JSON are detected", () => {
   event.output = 0.7;
   assert.deepEqual(verifyCassette(cassette), { valid: false, eventIndex: 0, reason: "event hash mismatch", rootHash: event.previousHash });
   assert.throws(() => parseCassette('{"version":"runmirror.cassette/v1","runId":"x"}\n{bad}\n'), /corrupt JSON at line 2/u);
+});
+
+test("cassette verification rejects sparse and extended authenticated arrays", () => {
+  const recorder = new Recorder({ runId: "dense-arrays" });
+  recorder.random("x", 0.5);
+
+  const sparse = recorder.cassette();
+  sparse.events.length = 2;
+  assert.deepEqual(verifyCassette(sparse), {
+    valid: false,
+    reason: "events must be a dense array",
+    rootHash: "0".repeat(64),
+  });
+
+  const extended = recorder.cassette();
+  (extended.events as typeof extended.events & { metadata?: string }).metadata = "not-cassette-array-data";
+  assert.deepEqual(verifyCassette(extended), {
+    valid: false,
+    reason: "events must be a dense array",
+    rootHash: "0".repeat(64),
+  });
 });

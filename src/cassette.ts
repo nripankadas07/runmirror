@@ -3,12 +3,14 @@ import { canonicalJson, redact, sha256 } from "./canonical.js";
 export const CASSETTE_VERSION = "runmirror.cassette/v1" as const;
 export const EVENT_VERSION = "runmirror.event/v1" as const;
 export type EventKind = "model" | "tool" | "file" | "approval" | "clock" | "random" | "error";
+export const RECORDER_VERSION = "runmirror@0.1.1" as const;
+export type RecorderVersion = typeof RECORDER_VERSION | "runmirror@0.1.0";
 
 export interface CassetteHeader {
   version: typeof CASSETTE_VERSION;
   runId: string;
   createdAt: string;
-  recorder: "runmirror@0.1.0";
+  recorder: RecorderVersion;
   redaction: { keys: string[]; replacement: "[REDACTED]" };
 }
 
@@ -49,6 +51,12 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boo
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
+function isDenseArray(value: unknown): value is unknown[] {
+  return Array.isArray(value)
+    && Object.keys(value).length === value.length
+    && Object.keys(value).every((key, index) => key === String(index));
+}
+
 function isCanonicalTimestamp(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)) return false;
   const milliseconds = Date.parse(value);
@@ -81,9 +89,9 @@ function validateHeader(value: unknown): string | undefined {
   if (value.version !== CASSETTE_VERSION) return "cassette version is unsupported";
   if (typeof value.runId !== "string" || value.runId.trim().length === 0) return "runId must be a nonblank string";
   if (!isCanonicalTimestamp(value.createdAt)) return "createdAt must be a canonical ISO timestamp";
-  if (value.recorder !== "runmirror@0.1.0") return "recorder version is unsupported";
+  if (value.recorder !== RECORDER_VERSION && value.recorder !== "runmirror@0.1.0") return "recorder version is unsupported";
   if (!isRecord(value.redaction) || !exactKeys(value.redaction, ["keys", "replacement"])) return "redaction schema is invalid";
-  if (!Array.isArray(value.redaction.keys) || value.redaction.keys.some((key) => typeof key !== "string" || key.trim().length === 0)) return "redaction keys must be strings";
+  if (!isDenseArray(value.redaction.keys) || value.redaction.keys.some((key) => typeof key !== "string" || key.trim().length === 0)) return "redaction keys must be a dense array of strings";
   if (new Set(value.redaction.keys).size !== value.redaction.keys.length) return "redaction keys must be unique";
   if (value.redaction.replacement !== "[REDACTED]") return "redaction replacement is unsupported";
   return undefined;
@@ -116,14 +124,14 @@ export class Recorder {
     if (typeof options.runId !== "string" || options.runId.trim().length === 0) throw new Error("runId must be a nonblank string");
     if (options.createdAt !== undefined && !isCanonicalTimestamp(options.createdAt)) throw new Error("createdAt must be a canonical ISO timestamp");
     if (options.baseTimeMs !== undefined && !Number.isSafeInteger(options.baseTimeMs)) throw new Error("baseTimeMs must be a safe integer");
-    if (options.redactKeys !== undefined && options.redactKeys.some((key) => typeof key !== "string" || key.trim().length === 0)) throw new Error("redactKeys must contain nonblank strings");
+    if (options.redactKeys !== undefined && (!isDenseArray(options.redactKeys) || options.redactKeys.some((key) => typeof key !== "string" || key.trim().length === 0))) throw new Error("redactKeys must contain a dense array of nonblank strings");
     if (options.redactKeys !== undefined && new Set(options.redactKeys).size !== options.redactKeys.length) throw new Error("redactKeys must be unique");
     this.#baseTimeMs = options.baseTimeMs ?? 0;
     this.header = {
       version: CASSETTE_VERSION,
       runId: options.runId,
       createdAt: options.createdAt ?? "1970-01-01T00:00:00.000Z",
-      recorder: "runmirror@0.1.0",
+      recorder: RECORDER_VERSION,
       redaction: { keys: [...(options.redactKeys ?? [])].sort(), replacement: "[REDACTED]" },
     };
   }
@@ -183,7 +191,7 @@ export function verifyCassette(cassette: unknown): { valid: boolean; eventIndex?
   if (!isRecord(cassette) || !exactKeys(cassette, ["header", "events"])) return { valid: false, reason: "cassette schema is invalid", rootHash: INVALID_ROOT };
   const headerIssue = validateHeader(cassette.header);
   if (headerIssue !== undefined) return { valid: false, reason: headerIssue, rootHash: INVALID_ROOT };
-  if (!Array.isArray(cassette.events)) return { valid: false, reason: "events must be an array", rootHash: INVALID_ROOT };
+  if (!isDenseArray(cassette.events)) return { valid: false, reason: "events must be a dense array", rootHash: INVALID_ROOT };
   const typed = cassette as unknown as Cassette;
   let previousHash = sha256(canonicalJson(typed.header));
   for (let index = 0; index < typed.events.length; index += 1) {
