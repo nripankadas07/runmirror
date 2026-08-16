@@ -1,0 +1,41 @@
+{
+  "name": "runmirror",
+  "version": "0.1.0",
+  "description": "Explicit deterministic recorder and offline replay SDK for agent runs.",
+  "type": "module",
+  "private": true,
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
+  "files": ["dist/src", "README.md", "LICENSE", "docs"],
+  "engines": { "node": ">=22" },
+  "bin": { "runmirror": "dist/src/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "package:smoke": "node scripts/package-smoke.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run check",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "demo": "npm run build && node dist/src/cli.js demo artifacts/demo",
+    "check": "npm run test && npm run demo"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nripankadas07/runmirror.git"
+  },
+  "homepage": "https://github.com/nripankadas07/runmirror#readme",
+  "bugs": {
+    "url": "https://github.com/nripankadas07/runmirror/issues"
+  },
+  "license": "MIT"
+}

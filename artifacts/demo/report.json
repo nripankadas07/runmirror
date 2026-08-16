@@ -1,0 +1,58 @@
+{
+  "version": "runmirror.report/v1",
+  "generatedBy": "runmirror@0.1.0",
+  "deterministic": true,
+  "runId": "offline-demo",
+  "integrity": {
+    "valid": true,
+    "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f"
+  },
+  "eventCount": 7,
+  "kinds": [
+    "approval",
+    "clock",
+    "error",
+    "file",
+    "model",
+    "random",
+    "tool"
+  ],
+  "replay": {
+    "version": "runmirror.replay/v1",
+    "runId": "offline-demo",
+    "integrity": {
+      "valid": true,
+      "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f"
+    },
+    "matchedEvents": 7,
+    "totalEvents": 7,
+    "divergence": null
+  },
+  "driftProbe": {
+    "version": "runmirror.replay/v1",
+    "runId": "offline-demo",
+    "integrity": {
+      "valid": true,
+      "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f"
+    },
+    "matchedEvents": 3,
+    "totalEvents": 7,
+    "divergence": {
+      "eventIndex": 3,
+      "eventId": "offline-demo:0003",
+      "kind": "tool",
+      "path": "$.bytes",
+      "expected": {
+        "encoding": "sha256",
+        "digest": "91822859e71098fe653ab00e0c4a7c1fcd90437b8eedc55a2babf0db7554398c",
+        "valueType": "number"
+      },
+      "actual": {
+        "encoding": "sha256",
+        "digest": "f7c9340c0c98fa97c6d991963765dc66b8568472e7a2ade46d65731cc491cc3a",
+        "valueType": "number"
+      },
+      "reason": "output-mismatch"
+    }
+  }
+}

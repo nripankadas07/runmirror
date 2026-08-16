@@ -1,0 +1,6 @@
+{
+  "version": "runmirror.demo-plan/v1",
+  "note": "This fixture describes explicit recorder calls. It is not a claim of transparent interception.",
+  "events": ["clock", "random", "model", "tool", "file", "approval", "error"],
+  "expectedFirstDrift": { "eventId": "offline-demo:0003", "path": "$.bytes" }
+}

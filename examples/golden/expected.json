@@ -1,0 +1,11 @@
+{
+  "version": "runmirror.golden/v1",
+  "runId": "offline-demo",
+  "events": 7,
+  "kinds": ["approval", "clock", "error", "file", "model", "random", "tool"],
+  "integrityValid": true,
+  "rootHash": "10c010002be0e52fa7341bf2b33b24fed1171595bde6a553f96183aa0781bc2f",
+  "baselineMatched": 7,
+  "firstDrift": { "eventId": "offline-demo:0003", "path": "$.bytes", "expected": 11, "actual": 19 },
+  "artifacts": ["cassette.jsonl", "report.json", "report.md", "index.html"]
+}
