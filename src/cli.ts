@@ -8,6 +8,7 @@ import { recordedOutputAdapters, replay } from "./replay.js";
 async function main(args: string[]): Promise<number> {
   const [command = "help", ...rest] = args;
   if (command === "demo") {
+    if (rest.length > 1 || rest[0]?.startsWith("-") === true) throw new Error("usage: runmirror demo [OUT]");
     const out = rest[0] ?? "artifacts/demo";
     const run = await createDemoRun();
     await writeArtifacts(out, run);
@@ -15,6 +16,7 @@ async function main(args: string[]): Promise<number> {
     return 0;
   }
   if (command === "verify") {
+    if (rest.length !== 1 || rest[0]?.startsWith("-") === true) throw new Error("usage: runmirror verify CASSETTE.jsonl");
     const path = rest[0];
     if (path === undefined) throw new Error("usage: runmirror verify CASSETTE.jsonl");
     const verification = verifyCassette(parseCassette(await readFile(path, "utf8")));
@@ -22,12 +24,14 @@ async function main(args: string[]): Promise<number> {
     return verification.valid ? 0 : 1;
   }
   if (command === "replay") {
+    if (rest.length !== 1 || rest[0]?.startsWith("-") === true) throw new Error("usage: runmirror replay CASSETTE.jsonl");
     const path = rest[0];
     if (path === undefined) throw new Error("usage: runmirror replay CASSETTE.jsonl");
     const result = await replay(parseCassette(await readFile(path, "utf8")), recordedOutputAdapters());
     console.log(JSON.stringify(result));
     return result.integrity.valid && result.divergence === null ? 0 : 1;
   }
+  if (["help", "--help", "-h"].includes(command) && rest.length > 0) throw new Error("help does not accept operands");
   console.log("runmirror demo [OUT]\nrunmirror verify CASSETTE.jsonl\nrunmirror replay CASSETTE.jsonl");
   return command === "help" || command === "--help" || command === "-h" ? 0 : 2;
 }

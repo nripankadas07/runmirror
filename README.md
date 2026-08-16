@@ -46,7 +46,7 @@ The host application owns every integration point and decides exactly what is re
 
 ## Replay
 
-Replay accepts one explicit handler per event kind. It strictly validates the complete header and every event before an adapter can run, then stops at the first missing adapter, thrown adapter error, or structural output mismatch. Divergence values are redacted before comparison and represented only by domain-separated SHA-256 fingerprints. Secret-shaped/configured event IDs and paths are replaced by redacted correlation fingerprints, so raw adapter outputs, exception messages, and recognizable secret metadata are not copied into replay artifacts.
+Replay accepts one explicit handler per event kind. It strictly validates and snapshots the complete header and every event before an adapter can run, passes deeply frozen event clones to handlers, and verifies integrity again before returning. It stops at the first missing adapter, thrown adapter error, or structural output mismatch. Divergence values are redacted before comparison and represented only by domain-separated SHA-256 fingerprints. Secret-shaped/configured event IDs and paths are replaced by redacted correlation fingerprints, so raw adapter outputs, exception messages, and recognizable secret metadata are not copied into replay artifacts.
 
 `recordedOutputAdapters()` is intentionally a fixture adapter for offline demonstrations. A real integration should supply adapters that call the system being tested.
 
